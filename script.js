@@ -3,6 +3,10 @@ const message = document.getElementById("form-message");
 const startDate = document.getElementById("start-date");
 const endDate = document.getElementById("end-date");
 
+const results = document.getElementById("results");
+const resultsSummary = document.getElementById("results-summary");
+const destinationGrid = document.getElementById("destination-grid");
+
 function toDateValue(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -63,7 +67,7 @@ const destinations = {
 
   Adventure: [
     { name: "Madeira", country: "Portugal", cost: 950 },
-    { name: "Interlaken", country: "Switzerland", cost: 1_150 },
+    { name: "Interlaken", country: "Switzerland", cost: 1150 },
     { name: "Ljubljana", country: "Slovenia", cost: 900 },
   ],
 };
@@ -97,6 +101,9 @@ startDate.addEventListener("change", () => {
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
+
+  // Hide previous results while validating the new search
+  results.hidden = true;
 
   const airport = form.airport.value.trim();
   const budget = Number(form.budget.value);
@@ -171,7 +178,9 @@ form.addEventListener("submit", (event) => {
     .slice(0, 3);
 
   message.hidden = false;
+  results.hidden = true;
 
+  // No matches
   if (matchingDestinations.length === 0) {
     message.innerHTML = `
       <strong>No matches found yet.</strong><br><br>
@@ -181,33 +190,41 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
-  const destinationHTML = matchingDestinations
+  // Show the results section
+  results.hidden = false;
+  message.hidden = true;
+
+  resultsSummary.textContent =
+    `${formatDate(startDate.value)} to ${formatDate(endDate.value)} · ` +
+    `${nights} nights · ${travellers} traveller(s)`;
+
+  destinationGrid.innerHTML = matchingDestinations
     .map(
       (destination) => `
-        <div class="destination-card">
+        <article class="destination-card">
           <h3>${destination.name}</h3>
-          <p>${destination.country}</p>
-          <p>${nights} nights · Estimated £${destination.cost.toLocaleString()}</p>
-        </div>
+
+          <p class="destination-country">
+            ${destination.country}
+          </p>
+
+          <div class="destination-details">
+            <span>📅 ${nights} nights</span>
+            <span>👥 ${travellers} traveller(s)</span>
+            <span class="destination-price">
+              💷 From £${destination.cost.toLocaleString()}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            class="destination-button"
+            onclick="alert('Trip details will be added in a later version.')"
+          >
+            Explore trip →
+          </button>
+        </article>
       `
     )
     .join("");
-
-  message.innerHTML = `
-    <h2>Your possible trips</h2>
-    <p>
-      ${formatDate(startDate.value)} to ${formatDate(endDate.value)}
-      · ${nights} nights
-      · ${travellers} traveller(s)
-    </p>
-
-    ${destinationHTML}
-
-    <p>
-      <small>
-        These are demonstration estimates for the first version.
-        Live travel prices will be added later.
-      </small>
-    </p>
-  `;
 });
