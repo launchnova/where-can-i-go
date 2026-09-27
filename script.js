@@ -31,12 +31,51 @@ function formatDate(value) {
   });
 }
 
+function calculateNights(from, to) {
+  const difference = to.getTime() - from.getTime();
+  return Math.round(difference / (1000 * 60 * 60 * 24));
+}
+
+const destinations = {
+  Beach: [
+    { name: "Lisbon", country: "Portugal", cost: 780 },
+    { name: "Malta", country: "Malta", cost: 920 },
+    { name: "Barcelona", country: "Spain", cost: 850 },
+  ],
+
+  City: [
+    { name: "Barcelona", country: "Spain", cost: 850 },
+    { name: "Rome", country: "Italy", cost: 890 },
+    { name: "Lisbon", country: "Portugal", cost: 780 },
+  ],
+
+  Nature: [
+    { name: "Madeira", country: "Portugal", cost: 950 },
+    { name: "Innsbruck", country: "Austria", cost: 980 },
+    { name: "Lake Bled", country: "Slovenia", cost: 900 },
+  ],
+
+  Family: [
+    { name: "Algarve", country: "Portugal", cost: 880 },
+    { name: "Tenerife", country: "Spain", cost: 940 },
+    { name: "Majorca", country: "Spain", cost: 860 },
+  ],
+
+  Adventure: [
+    { name: "Madeira", country: "Portugal", cost: 950 },
+    { name: "Interlaken", country: "Switzerland", cost: 1_150 },
+    { name: "Ljubljana", country: "Slovenia", cost: 900 },
+  ],
+};
+
 const today = new Date();
 today.setHours(0, 0, 0, 0);
+
 startDate.min = toDateValue(today);
 
 const defaultStart = addDays(today, 14);
 const defaultEnd = addDays(defaultStart, 7);
+
 startDate.value = toDateValue(defaultStart);
 endDate.value = toDateValue(defaultEnd);
 endDate.min = toDateValue(addDays(defaultStart, 1));
@@ -44,11 +83,13 @@ endDate.min = toDateValue(addDays(defaultStart, 1));
 startDate.addEventListener("change", () => {
   const from = parseDate(startDate.value);
   const to = parseDate(endDate.value);
+
   if (!from) {
     return;
   }
 
   endDate.min = toDateValue(addDays(from, 1));
+
   if (!to || to <= from) {
     endDate.value = toDateValue(addDays(from, 7));
   }
@@ -58,27 +99,115 @@ form.addEventListener("submit", (event) => {
   event.preventDefault();
 
   const airport = form.airport.value.trim();
-  const budget = form.budget.value;
-  const travellers = form.travellers.value;
+  const budget = Number(form.budget.value);
+  const travellers = Number(form.travellers.value);
+
+  const from = parseDate(startDate.value);
+  const to = parseDate(endDate.value);
+
   const styles = Array.from(
     form.querySelectorAll('input[name="style"]:checked')
   ).map((box) => box.value);
-  const styleText =
-    styles.length === 0 ? "any travel style" : styles.join(", ");
+
+  // Basic validation
+  if (!airport) {
+    message.hidden = false;
+    message.textContent = "Please enter your departure airport.";
+    return;
+  }
+
+  if (!from || !to) {
+    message.hidden = false;
+    message.textContent = "Please select your travel dates.";
+    return;
+  }
+
+  if (to <= from) {
+    message.hidden = false;
+    message.textContent = "Your return date must be after your departure date.";
+    return;
+  }
+
+  if (!budget || budget <= 0) {
+    message.hidden = false;
+    message.textContent = "Please enter a travel budget greater than £0.";
+    return;
+  }
+
+  if (!travellers || travellers < 1) {
+    message.hidden = false;
+    message.textContent = "Please enter at least 1 traveller.";
+    return;
+  }
+
+  if (styles.length === 0) {
+    message.hidden = false;
+    message.textContent = "Please select at least one travel style.";
+    return;
+  }
+
+  const nights = calculateNights(from, to);
+
+  // Combine destinations from all selected styles
+  const selectedDestinations = [];
+
+  styles.forEach((style) => {
+    if (destinations[style]) {
+      destinations[style].forEach((destination) => {
+        const alreadyAdded = selectedDestinations.some(
+          (item) => item.name === destination.name
+        );
+
+        if (!alreadyAdded) {
+          selectedDestinations.push(destination);
+        }
+      });
+    }
+  });
+
+  // Keep destinations within the user's budget
+  const matchingDestinations = selectedDestinations
+    .filter((destination) => destination.cost <= budget)
+    .slice(0, 3);
 
   message.hidden = false;
-  message.textContent =
-    "Thanks. We have your search from " +
-    airport +
-    " for £" +
-    budget +
-    ", " +
-    formatDate(startDate.value) +
-    " to " +
-    formatDate(endDate.value) +
-    ", " +
-    travellers +
-    " traveller(s), " +
-    styleText +
-    ". Trip matching will come in a later version.";
+
+  if (matchingDestinations.length === 0) {
+    message.innerHTML = `
+      <strong>No matches found yet.</strong><br><br>
+      We couldn't find a sample destination within your £${budget.toLocaleString()} budget.
+      Try increasing your budget or selecting another travel style.
+    `;
+    return;
+  }
+
+  const destinationHTML = matchingDestinations
+    .map(
+      (destination) => `
+        <div class="destination-card">
+          <h3>${destination.name}</h3>
+          <p>${destination.country}</p>
+          <p>${nights} nights · Estimated £${destination.cost.toLocaleString()}</p>
+        </div>
+      `
+    )
+    .join("");
+
+  message.innerHTML = `
+    <h2>Your possible trips</h2>
+    <p>
+      ${formatDate(startDate.value)} to ${formatDate(endDate.value)}
+      · ${nights} nights
+      · ${travellers} traveller(s)
+    </p>
+
+    ${destinationHTML}
+
+    <p>
+      <small>
+        These are demonstration estimates for the first version.
+        Live travel prices will be added later.
+      </small>
+    </p>
+  `;
 });
